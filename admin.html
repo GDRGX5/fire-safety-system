@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+    <meta name="theme-color" content="#9b59b6">
+    <title>開發者後台 - 屋苑管理</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root{--primary:#9b59b6;--success:#2ed573;--danger:#ff4757;--warning:#ffa502;--bg:#0f0f1a;--card:#1a1a2e;--text:#fff;}
+        body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:12px;padding-bottom:100px;}
+        .hdr{display:flex;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.1);margin-bottom:16px;}
+        .hdr a{color:var(--text);text-decoration:none;font-size:26px;padding:8px}
+        .hdr h1{flex:1;font-size:18px;display:flex;align-items:center;gap:8px}
+        .hdr .badge{background:var(--primary);padding:4px 10px;border-radius:4px;font-size:11px;}
+        .tabs{display:flex;gap:8px;margin-bottom:16px;overflow-x:auto;}
+        .tab{padding:12px 20px;background:var(--card);border:none;border-radius:10px;color:var(--text);font-size:14px;cursor:pointer;}
+        .tab.active{background:var(--primary);font-weight:bold;}
+        .section{background:var(--card);border-radius:14px;padding:16px;margin-bottom:16px;}
+        .section-title{font-size:16px;font-weight:bold;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;}
+        .section-title button{padding:8px 14px;background:var(--primary);border:none;border-radius:8px;color:#fff;font-size:13px;cursor:pointer;}
+        .estate-list{display:flex;flex-direction:column;gap:12px;}
+        .estate-item{background:rgba(255,255,255,0.05);border-radius:12px;padding:14px;border-left:4px solid var(--primary);}
+        .estate-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+        .estate-name{font-size:17px;font-weight:bold;}
+        .estate-key{font-size:11px;opacity:0.6;background:rgba(255,255,255,0.1);padding:2px 8px;border-radius:4px;}
+        .estate-meta{font-size:12px;opacity:0.7;margin-bottom:10px;}
+        .estate-buildings{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+        .building-tag{padding:4px 10px;background:rgba(155,89,182,0.2);border-radius:6px;font-size:11px;}
+        .estate-actions{display:flex;gap:8px;}
+        .estate-actions button{padding:8px 12px;border:none;border-radius:6px;font-size:12px;cursor:pointer;}
+        .btn-edit{background:rgba(255,165,2,0.3);color:var(--warning);}
+        .btn-delete{background:rgba(255,71,87,0.3);color:var(--danger);}
+        .btn-add-building{background:rgba(46,213,115,0.3);color:var(--success);}
+        /* 表單 */
+        .form-section{display:none;}
+        .form-section.show{display:block}
+        .form-group{margin-bottom:14px;}
+        .form-group label{display:block;font-size:12px;opacity:0.7;margin-bottom:4px;}
+        .form-group input,.form-group textarea{width:100%;padding:12px;border-radius:8px;border:2px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.08);color:var(--text);font-size:15px;}
+        .form-group input:focus,.form-group textarea:focus{border-color:var(--primary);outline:none;}
+        .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+        .form-btns{display:flex;gap:10px;margin-top:16px;}
+        .form-btns button{flex:1;padding:14px;border:none;border-radius:10px;font-size:15px;font-weight:bold;cursor:pointer;}
+        .form-btns .save{background:var(--success);color:#000}
+        .form-btns .cancel{background:rgba(255,255,255,0.1);color:#fff}
+        /* 數據導入導出 */
+        .data-section{display:flex;flex-direction:column;gap:12px;}
+        .data-section textarea{height:200px;font-family:monospace;font-size:12px;}
+        .data-btns{display:flex;gap:8px;flex-wrap:wrap;}
+        .data-btns button{padding:12px 16px;border:none;border-radius:8px;font-size:13px;cursor:pointer;}
+        .data-btns .export{background:var(--primary);color:#fff}
+        .data-btns .import{background:var(--success);color:#000}
+        .data-btns .reset{background:var(--danger);color:#fff}
+        /* 統計 */
+        .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;}
+        .stat{background:var(--card);border-radius:12px;padding:16px;text-align:center;}
+        .stat .num{font-size:32px;font-weight:bold;color:var(--primary);}
+        .stat .label{font-size:12px;opacity:0.7;margin-top:4px;}
+        /* 大廈編輯 */
+        .building-editor{background:rgba(255,255,255,0.03);border-radius:10px;padding:12px;margin-top:10px;}
+        .building-editor h4{font-size:13px;margin-bottom:10px;}
+        .building-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;padding:8px;background:rgba(255,255,255,0.05);border-radius:6px;}
+        .building-row input{flex:1;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.08);color:var(--text);font-size:13px;}
+        .building-row button{padding:6px 10px;border:none;border-radius:4px;font-size:11px;cursor:pointer;}
+        .building-row .remove{background:rgba(255,71,87,0.3);color:var(--danger);}
+        .add-building-btn{padding:10px;background:rgba(46,213,115,0.2);border:2px dashed rgba(46,213,115,0.5);border-radius:8px;color:var(--success);font-size:13px;cursor:pointer;text-align:center;margin-top:8px;}
+        /* 隱藏 */
+        .hidden{display:none !important}
+    </style>
+</head>
+<body>
+    <header class="hdr">
+        <a href="index.html">←</a>
+        <h1>⚙️ 開發者後台 <span class="badge">ADMIN</span></h1>
+    </header>
+
+    <!-- 統計 -->
+    <section class="stats">
+        <div class="stat">
+            <div class="num" id="statEstates">0</div>
+            <div class="label">屋苑數量</div>
+        </div>
+        <div class="stat">
+            <div class="num" id="statBuildings">0</div>
+            <div class="label">大廈數量</div>
+        </div>
+        <div class="stat">
+            <div class="num" id="statReports">0</div>
+            <div class="label">報告數量</div>
+        </div>
+    </section>
+
+    <!-- 標籤頁 -->
+    <div class="tabs">
+        <button class="tab active" onclick="showTab('estates')">🏢 屋苑管理</button>
+        <button class="tab" onclick="showTab('data')">💾 數據管理</button>
+        <button class="tab" onclick="showTab('add')">➕ 新增屋苑</button>
+    </div>
+
+    <!-- 屋苑列表 -->
+    <section class="section" id="tabEstates">
+        <div class="section-title">
+            <span>屋苑列表</span>
+            <button onclick="showTab('add')">➕ 新增</button>
+        </div>
+        <div class="estate-list" id="estateList"></div>
+    </section>
+
+    <!-- 新增/編輯屋苑 -->
+    <section class="section form-section" id="tabAdd">
+        <div class="section-title">
+            <span id="formTitle">新增屋苑</span>
+        </div>
+        <input type="hidden" id="editingKey">
+        <div class="form-group">
+            <label>屋苑識別碼（英文，如 meifoo）</label>
+            <input type="text" id="estateKey" placeholder="小寫英文，無空格">
+        </div>
+        <div class="form-group">
+            <label>屋苑名稱</label>
+            <input type="text" id="estateName" placeholder="如：美孚新邨">
+        </div>
+        <div class="form-group">
+            <label>別名（逗號分隔）</label>
+            <input type="text" id="estateAliases" placeholder="如：美孚, 美孚新村">
+        </div>
+        
+        <div class="building-editor">
+            <h4>大廈列表</h4>
+            <div id="buildingList"></div>
+            <div class="add-building-btn" onclick="addBuildingRow()">➕ 新增大廈</div>
+        </div>
+        
+        <div class="form-btns">
+            <button class="save" onclick="saveEstate()">💾 保存</button>
+            <button class="cancel" onclick="cancelEdit()">取消</button>
+        </div>
+    </section>
+
+    <!-- 數據管理 -->
+    <section class="section" id="tabData" style="display:none">
+        <div class="section-title">數據管理</div>
+        <div class="data-section">
+            <div class="form-group">
+                <label>屋苑數據 (JSON)</label>
+                <textarea id="dataTextarea" placeholder="JSON數據將顯示在此"></textarea>
+            </div>
+            <div class="data-btns">
+                <button class="export" onclick="exportData()">📤 導出數據</button>
+                <button class="import" onclick="importData()">📥 導入數據</button>
+                <button class="reset" onclick="resetData()">🔄 重置為預設</button>
+            </div>
+        </div>
+    </section>
+
+    <script src="estates-data.js"></script>
+    <script>
+    let currentTab = 'estates';
+    let buildingCounter = 0;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        loadEstateList();
+        updateStats();
+        
+        if ('BroadcastChannel' in window) {
+            const ch = new BroadcastChannel('fire_safety_sync');
+            ch.onmessage = () => {
+                loadEstateList();
+                updateStats();
+            };
+        }
+    });
+
+    function showTab(tab) {
+        currentTab = tab;
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        event.target.classList.add('active');
+        
+        document.getElementById('tabEstates').style.display = tab === 'estates' ? 'block' : 'none';
+        document.getElementById('tabAdd').style.display = tab === 'add' ? 'block' : 'none';
+        document.getElementById('tabData').style.display = tab === 'data' ? 'block' : 'none';
+        
+        if (tab === 'add') {
+            resetForm();
+        }
+        if (tab === 'data') {
+            document.getElementById('dataTextarea').value = window.estatesManager.exportData();
+        }
+    }
+
+    function updateStats() {
+        const estates = window.estatesManager.getAllEstates();
+        const estateCount = Object.keys(estates).length;
+        let buildingCount = 0;
+        for (const estate of Object.values(estates)) {
+            buildingCount += estate.buildings?.length || 0;
+        }
+        const reports = JSON.parse(localStorage.getItem('fire_reports') || '[]');
+        
+        document.getElementById('statEstates').textContent = estateCount;
+        document.getElementById('statBuildings').textContent = buildingCount;
+        document.getElementById('statReports').textContent = reports.length;
+    }
+
+    function loadEstateList() {
+        const estates = window.estatesManager.getAllEstates();
+        const container = document.getElementById('estateList');
+        
+        if (Object.keys(estates).length === 0) {
+            container.innerHTML = '<p style="opacity:0.6;text-align:center;padding:20px">暫無屋苑數據</p>';
+            return;
+        }
+        
+        container.innerHTML = Object.entries(estates).map(([key, estate]) => `
+            <div class="estate-item">
+                <div class="estate-header">
+                    <span class="estate-name">${estate.name}</span>
+                    <span class="estate-key">${key}</span>
+                </div>
+                <div class="estate-meta">
+                    別名：${estate.aliases?.join(', ') || '無'} | 
+                    大廈：${estate.buildings?.length || 0} 棟
+                </div>
+                <div class="estate-buildings">
+                    ${(estate.buildings || []).map(b => `
+                        <span class="building-tag">${b.name} (${b.floors}層, ${b.units.length}室)</span>
+                    `).join('')}
+                </div>
+                <div class="estate-actions">
+                    <button class="btn-edit" onclick="editEstate('${key}')">✏️ 編輯</button>
+                    <button class="btn-delete" onclick="deleteEstate('${key}')">🗑️ 刪除</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function resetForm() {
+        document.getElementById('editingKey').value = '';
+        document.getElementById('estateKey').value = '';
+        document.getElementById('estateName').value = '';
+        document.getElementById('estateAliases').value = '';
+        document.getElementById('buildingList').innerHTML = '';
+        document.getElementById('formTitle').textContent = '新增屋苑';
+        document.getElementById('estateKey').disabled = false;
+        buildingCounter = 0;
+        addBuildingRow(); // 預設一行
+    }
+
+    function addBuildingRow(data = null) {
+        const container = document.getElementById('buildingList');
+        const id = buildingCounter++;
+        const html = `
+            <div class="building-row" id="building-${id}">
+                <input type="text" placeholder="大廈名稱" class="b-name" value="${data?.name || ''}">
+                <input type="number" placeholder="樓層" class="b-floors" style="width:70px" value="${data?.floors || ''}">
+                <input type="text" placeholder="單位(逗號分隔)" class="b-units" value="${data?.units?.join(',') || 'A,B,C,D,E,F,G,H'}">
+                <button class="remove" onclick="removeBuildingRow(${id})">×</button>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', html);
+    }
+
+    function removeBuildingRow(id) {
+        document.getElementById(`building-${id}`)?.remove();
+    }
+
+    function editEstate(key) {
+        const estate = window.estatesManager.getEstate(key);
+        if (!estate) return;
+        
+        showTab('add');
+        document.getElementById('formTitle').textContent = '編輯屋苑';
+        document.getElementById('editingKey').value = key;
+        document.getElementById('estateKey').value = key;
+        document.getElementById('estateKey').disabled = true;
+        document.getElementById('estateName').value = estate.name;
+        document.getElementById('estateAliases').value = estate.aliases?.join(', ') || '';
+        
+        document.getElementById('buildingList').innerHTML = '';
+        buildingCounter = 0;
+        (estate.buildings || []).forEach(b => addBuildingRow(b));
+        
+        if (estate.buildings?.length === 0) {
+            addBuildingRow();
+        }
+    }
+
+    function saveEstate() {
+        const editingKey = document.getElementById('editingKey').value;
+        const key = document.getElementById('estateKey').value.trim().toLowerCase().replace(/\s/g, '');
+        const name = document.getElementById('estateName').value.trim();
+        const aliasesStr = document.getElementById('estateAliases').value.trim();
+        
+        if (!key || !name) {
+            alert('請填寫識別碼和名稱');
+            return;
+        }
+        
+        if (!/^[a-z0-9]+$/.test(key)) {
+            alert('識別碼只能包含小寫英文和數字');
+            return;
+        }
+        
+        const aliases = aliasesStr ? aliasesStr.split(',').map(s => s.trim()).filter(s => s) : [];
+        
+        // 收集大廈數據
+        const buildings = [];
+        document.querySelectorAll('.building-row').forEach(row => {
+            const bName = row.querySelector('.b-name').value.trim();
+            const bFloors = parseInt(row.querySelector('.b-floors').value) || 20;
+            const bUnits = row.querySelector('.b-units').value.split(',').map(s => s.trim()).filter(s => s);
+            
+            if (bName) {
+                buildings.push({
+                    name: bName,
+                    floors: bFloors,
+                    units: bUnits.length > 0 ? bUnits : ['A','B','C','D','E','F','G','H']
+                });
+            }
+        });
+        
+        const estateData = { name, aliases, buildings };
+        
+        let result;
+        if (editingKey) {
+            result = window.estatesManager.updateEstate(editingKey, estateData);
+        } else {
+            result = window.estatesManager.addEstate(key, estateData);
+        }
+        
+        if (result.success) {
+            alert('✅ 保存成功');
+            showTab('estates');
+            loadEstateList();
+            updateStats();
+        } else {
+            alert('❌ ' + result.error);
+        }
+    }
+
+    function cancelEdit() {
+        showTab('estates');
+    }
+
+    function deleteEstate(key) {
+        const estate = window.estatesManager.getEstate(key);
+        if (!estate) return;
+        
+        if (confirm(`確定要刪除「${estate.name}」嗎？此操作無法撤銷。`)) {
+            const result = window.estatesManager.deleteEstate(key);
+            if (result.success) {
+                alert('✅ 已刪除');
+                loadEstateList();
+                updateStats();
+            } else {
+                alert('❌ ' + result.error);
+            }
+        }
+    }
+
+    function exportData() {
+        const data = window.estatesManager.exportData();
+        document.getElementById('dataTextarea').value = data;
+        
+        // 下載檔案
+        const blob = new Blob([data], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `estates_backup_${new Date().toISOString().slice(0,10)}.json`;
+        a.click();
+        
+        alert('✅ 數據已導出');
+    }
+
+    function importData() {
+        const data = document.getElementById('dataTextarea').value.trim();
+        if (!data) {
+            alert('請先貼上JSON數據');
+            return;
+        }
+        
+        if (confirm('確定要導入數據嗎？現有數據將被覆蓋。')) {
+            const result = window.estatesManager.importData(data);
+            if (result.success) {
+                alert('✅ 數據已導入');
+                loadEstateList();
+                updateStats();
+            } else {
+                alert('❌ ' + result.error);
+            }
+        }
+    }
+
+    function resetData() {
+        if (confirm('確定要重置為預設數據嗎？所有自訂屋苑將被刪除。')) {
+            window.estatesManager.resetToDefault();
+            alert('✅ 已重置為預設數據');
+            loadEstateList();
+            updateStats();
+            document.getElementById('dataTextarea').value = window.estatesManager.exportData();
+        }
+    }
+    </script>
+</body>
+</html>

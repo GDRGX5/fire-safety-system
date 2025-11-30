@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+    <meta name="theme-color" content="#ff4757">
+    <title>消防員控制台</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root{--safe:#2ed573;--help:#ff4757;--trapped:#ffa502;--unknown:#747d8c;--bg:#0f0f1a;--card:#1a1a2e;--text:#fff;--review:#9b59b6;}
+        body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:12px;padding-bottom:80px;}
+        .hdr{display:flex;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.1);margin-bottom:16px;}
+        .hdr a{color:var(--text);text-decoration:none;font-size:26px;padding:8px}
+        .hdr h1{flex:1;font-size:16px;display:flex;align-items:center;gap:8px}
+        .hdr .live{background:var(--help);padding:4px 10px;border-radius:4px;font-size:11px;font-weight:bold;animation:blink 1.5s infinite;}
+        @keyframes blink{0%,100%{opacity:1}50%{opacity:0.5}}
+        .hdr .refresh{font-size:22px;padding:8px;cursor:pointer}
+        .summary{background:linear-gradient(135deg,#c0392b,#e74c3c);border-radius:14px;padding:16px;margin-bottom:16px;}
+        .summary-title{font-size:14px;font-weight:bold;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+        .summary-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}
+        .summary-stat{background:rgba(0,0,0,0.25);border-radius:10px;padding:10px 6px;text-align:center;}
+        .summary-stat .num{font-size:24px;font-weight:bold}
+        .summary-stat .label{font-size:9px;opacity:0.9;margin-top:2px}
+        .summary-stat.urgent{border:2px solid var(--trapped)}
+        .summary-stat.review{border:2px solid var(--review)}
+        .filter-tabs{display:flex;gap:8px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px;}
+        .filter-tab{padding:10px 14px;background:var(--card);border:none;border-radius:8px;color:var(--text);font-size:12px;white-space:nowrap;cursor:pointer;}
+        .filter-tab.active{font-weight:bold}
+        .filter-tab.trapped.active{background:var(--trapped);color:#000}
+        .filter-tab.help.active{background:var(--help)}
+        .filter-tab.safe.active{background:var(--safe);color:#000}
+        .filter-tab.review.active{background:var(--review)}
+        .rescue-list{display:flex;flex-direction:column;gap:12px}
+        .rescue-card{background:var(--card);border-radius:14px;padding:16px;border-left:5px solid var(--unknown);}
+        .rescue-card.trapped{border-left-color:var(--trapped)}
+        .rescue-card.help{border-left-color:var(--help)}
+        .rescue-card.safe{border-left-color:var(--safe)}
+        .rescue-card.review{border-left-color:var(--review);background:rgba(155,89,182,0.1);}
+        .rescue-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;}
+        .rescue-location{font-size:17px;font-weight:bold}
+        .rescue-badges{display:flex;gap:6px;flex-wrap:wrap;}
+        .rescue-priority{padding:4px 10px;border-radius:6px;font-size:11px;font-weight:bold;}
+        .rescue-priority.trapped{background:var(--trapped);color:#000}
+        .rescue-priority.help{background:var(--help)}
+        .rescue-priority.safe{background:var(--safe);color:#000}
+        .rescue-priority.review{background:var(--review)}
+        .rescue-meta{display:flex;gap:12px;font-size:12px;opacity:0.8;margin-bottom:10px;flex-wrap:wrap;}
+        .rescue-note{padding:12px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:13px;margin-bottom:12px;}
+        .rescue-photo{width:100%;max-height:160px;object-fit:cover;border-radius:8px;margin-bottom:12px;cursor:pointer;}
+        .rescue-actions{display:flex;gap:8px;flex-wrap:wrap;}
+        .rescue-actions button{flex:1;min-width:80px;padding:12px 8px;border:none;border-radius:8px;font-size:13px;font-weight:bold;cursor:pointer;}
+        .btn-rescued{background:var(--safe);color:#000}
+        .btn-navigate{background:rgba(255,255,255,0.12);color:var(--text)}
+        .btn-verify{background:var(--review);color:#fff}
+        .btn-edit{background:rgba(255,165,2,0.3);color:var(--trapped)}
+        .empty{text-align:center;padding:40px 20px;opacity:0.6;}
+        .empty .icon{font-size:52px;margin-bottom:12px}
+        .toolbar{position:fixed;bottom:0;left:0;right:0;display:flex;gap:6px;padding:12px 12px;background:linear-gradient(transparent,var(--bg) 30%);padding-top:30px;}
+        .toolbar button{flex:1;padding:12px 6px;background:var(--card);border:none;border-radius:10px;color:var(--text);font-size:11px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;}
+        .toolbar button span{font-size:18px}
+        .photo-modal{position:fixed;inset:0;background:#000;display:none;align-items:center;justify-content:center;z-index:2000;}
+        .photo-modal.show{display:flex}
+        .photo-modal img{max-width:100%;max-height:100%;object-fit:contain}
+        .photo-modal .close{position:absolute;top:20px;right:20px;width:48px;height:48px;background:rgba(255,255,255,0.2);border:none;border-radius:50%;color:#fff;font-size:26px;cursor:pointer;}
+        /* 編輯彈窗 */
+        .edit-modal{position:fixed;inset:0;background:rgba(0,0,0,0.95);display:none;align-items:center;justify-content:center;z-index:1500;padding:16px;}
+        .edit-modal.show{display:flex}
+        .edit-content{background:var(--card);border-radius:16px;padding:20px;max-width:400px;width:100%;max-height:90vh;overflow-y:auto;}
+        .edit-content h3{margin-bottom:16px;font-size:18px;}
+        .edit-field{margin-bottom:14px;}
+        .edit-field label{display:block;font-size:12px;opacity:0.7;margin-bottom:4px;}
+        .edit-field input,.edit-field select{width:100%;padding:12px;border-radius:8px;border:2px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.08);color:var(--text);font-size:16px;}
+        .edit-field input:focus,.edit-field select:focus{border-color:var(--safe);outline:none;}
+        .edit-btns{display:flex;gap:10px;margin-top:20px;}
+        .edit-btns button{flex:1;padding:14px;border:none;border-radius:10px;font-size:15px;font-weight:bold;cursor:pointer;}
+        .edit-btns .save{background:var(--safe);color:#000}
+        .edit-btns .cancel{background:rgba(255,255,255,0.1);color:#fff}
+        /* 手動新增 */
+        .add-section{background:var(--card);border-radius:14px;padding:16px;margin-bottom:16px;display:none;}
+        .add-section.show{display:block}
+        .add-section h3{margin-bottom:12px;font-size:15px;}
+    </style>
+</head>
+<body>
+    <header class="hdr">
+        <a href="index.html">←</a>
+        <h1>👨‍🚒 救援控制台 <span class="live">LIVE</span></h1>
+        <span class="refresh" onclick="loadReports()">🔄</span>
+    </header>
+
+    <section class="summary">
+        <div class="summary-title">🚨 緊急狀況摘要</div>
+        <div class="summary-stats">
+            <div class="summary-stat urgent">
+                <div class="num" id="statTrapped">0</div>
+                <div class="label">被困</div>
+            </div>
+            <div class="summary-stat">
+                <div class="num" id="statHelp">0</div>
+                <div class="label">需幫助</div>
+            </div>
+            <div class="summary-stat review">
+                <div class="num" id="statReview">0</div>
+                <div class="label">待審核</div>
+            </div>
+            <div class="summary-stat">
+                <div class="num" id="statSafe">0</div>
+                <div class="label">已安全</div>
+            </div>
+            <div class="summary-stat">
+                <div class="num" id="statTotal">0</div>
+                <div class="label">總報告</div>
+            </div>
+        </div>
+    </section>
+
+    <div class="filter-tabs">
+        <button class="filter-tab trapped active" onclick="setFilter('trapped')">🚨 被困 (<span id="tabTrapped">0</span>)</button>
+        <button class="filter-tab help" onclick="setFilter('help')">🆘 需幫助 (<span id="tabHelp">0</span>)</button>
+        <button class="filter-tab review" onclick="setFilter('review')">⚠️ 待審核 (<span id="tabReview">0</span>)</button>
+        <button class="filter-tab safe" onclick="setFilter('safe')">✅ 安全 (<span id="tabSafe">0</span>)</button>
+        <button class="filter-tab" onclick="setFilter('all')">全部</button>
+    </div>
+
+    <!-- 手動新增區域 -->
+    <section class="add-section" id="addSection">
+        <h3>➕ 手動新增報告</h3>
+        <div class="edit-field">
+            <label>屋苑</label>
+            <input type="text" id="addEstate" placeholder="屋苑名稱">
+        </div>
+        <div class="edit-field">
+            <label>大廈</label>
+            <input type="text" id="addBuilding" placeholder="大廈/座數">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="edit-field">
+                <label>樓層</label>
+                <input type="text" id="addFloor" placeholder="樓層">
+            </div>
+            <div class="edit-field">
+                <label>單位</label>
+                <input type="text" id="addUnit" placeholder="單位">
+            </div>
+        </div>
+        <div class="edit-field">
+            <label>狀態</label>
+            <select id="addStatus">
+                <option value="trapped">🚨 被困</option>
+                <option value="help">🆘 需幫助</option>
+                <option value="safe">✅ 安全</option>
+            </select>
+        </div>
+        <div class="edit-field">
+            <label>備註</label>
+            <input type="text" id="addNote" placeholder="備註信息">
+        </div>
+        <div class="edit-btns">
+            <button class="save" onclick="addManualReport()">新增報告</button>
+            <button class="cancel" onclick="toggleAddSection()">取消</button>
+        </div>
+    </section>
+
+    <section class="rescue-list" id="rescueList">
+        <div class="empty">
+            <div class="icon">✅</div>
+            <p>暫無需要救援的報告</p>
+        </div>
+    </section>
+
+    <div class="toolbar">
+        <button onclick="toggleAddSection()"><span>➕</span>新增</button>
+        <button onclick="exportCSV()"><span>📊</span>導出CSV</button>
+        <button onclick="exportJSON()"><span>📄</span>導出JSON</button>
+        <button onclick="generateDemo()"><span>🔧</span>測試數據</button>
+        <button onclick="clearAll()"><span>🗑️</span>清除</button>
+    </div>
+
+    <div class="photo-modal" id="photoModal" onclick="closePhoto()">
+        <img id="photoImg" src="">
+        <button class="close">×</button>
+    </div>
+
+    <!-- 編輯彈窗 -->
+    <div class="edit-modal" id="editModal">
+        <div class="edit-content">
+            <h3>✏️ 編輯/驗證報告</h3>
+            <input type="hidden" id="editId">
+            <div class="edit-field">
+                <label>屋苑</label>
+                <select id="editEstateKey">
+                    <option value="">-- 選擇已知屋苑 --</option>
+                </select>
+            </div>
+            <div class="edit-field">
+                <label>屋苑名稱（自訂）</label>
+                <input type="text" id="editEstate">
+            </div>
+            <div class="edit-field">
+                <label>大廈</label>
+                <input type="text" id="editBuilding">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <div class="edit-field">
+                    <label>樓層</label>
+                    <input type="text" id="editFloor">
+                </div>
+                <div class="edit-field">
+                    <label>單位</label>
+                    <input type="text" id="editUnit">
+                </div>
+            </div>
+            <div class="edit-field">
+                <label>狀態</label>
+                <select id="editStatus">
+                    <option value="trapped">🚨 被困</option>
+                    <option value="help">🆘 需幫助</option>
+                    <option value="safe">✅ 安全</option>
+                </select>
+            </div>
+            <div class="edit-field">
+                <label>備註</label>
+                <input type="text" id="editNote">
+            </div>
+            <div class="edit-btns">
+                <button class="save" onclick="saveEdit()">保存並驗證</button>
+                <button class="cancel" onclick="closeEditModal()">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="estates-data.js"></script>
+    <script>
+    let allReports = [];
+    let currentFilter = 'trapped';
+
+    document.addEventListener('DOMContentLoaded', function() {
+        loadReports();
+        populateEstateSelect();
+        
+        if ('BroadcastChannel' in window) {
+            const ch = new BroadcastChannel('fire_safety_sync');
+            ch.onmessage = (e) => {
+                if (e.data.type === 'new_report' || e.data.type === 'estates_updated') {
+                    loadReports();
+                }
+            };
+        }
+        
+        setInterval(loadReports, 5000);
+    });
+
+    function populateEstateSelect() {
+        const select = document.getElementById('editEstateKey');
+        const estates = window.estatesManager.getAllEstates();
+        select.innerHTML = '<option value="">-- 選擇已知屋苑 --</option>';
+        for (const [key, estate] of Object.entries(estates)) {
+            select.innerHTML += `<option value="${key}">${estate.name}</option>`;
+        }
+    }
+
+    function loadReports() {
+        allReports = JSON.parse(localStorage.getItem('fire_reports') || '[]');
+        updateStats();
+        renderList();
+    }
+
+    function updateStats() {
+        const trapped = allReports.filter(r => r.status === 'trapped').length;
+        const help = allReports.filter(r => r.status === 'help').length;
+        const safe = allReports.filter(r => r.status === 'safe').length;
+        const review = allReports.filter(r => r.needsManualReview && !r.verified).length;
+        
+        document.getElementById('statTrapped').textContent = trapped;
+        document.getElementById('statHelp').textContent = help;
+        document.getElementById('statSafe').textContent = safe;
+        document.getElementById('statReview').textContent = review;
+        document.getElementById('statTotal').textContent = allReports.length;
+        
+        document.getElementById('tabTrapped').textContent = trapped;
+        document.getElementById('tabHelp').textContent = help;
+        document.getElementById('tabSafe').textContent = safe;
+        document.getElementById('tabReview').textContent = review;
+    }
+
+    function setFilter(filter) {
+        currentFilter = filter;
+        document.querySelectorAll('.filter-tab').forEach(tab => tab.classList.remove('active'));
+        event.target.classList.add('active');
+        renderList();
+    }
+
+    function renderList() {
+        const container = document.getElementById('rescueList');
+        
+        let filtered = allReports;
+        if (currentFilter === 'review') {
+            filtered = allReports.filter(r => r.needsManualReview && !r.verified);
+        } else if (currentFilter !== 'all') {
+            filtered = allReports.filter(r => r.status === currentFilter);
+        }
+        
+        filtered.sort((a, b) => {
+            // 待審核優先
+            if ((a.needsManualReview && !a.verified) !== (b.needsManualReview && !b.verified)) {
+                return (a.needsManualReview && !a.verified) ? -1 : 1;
+            }
+            const priorityOrder = { trapped: 0, help: 1, safe: 2 };
+            if (priorityOrder[a.status] !== priorityOrder[b.status]) {
+                return priorityOrder[a.status] - priorityOrder[b.status];
+            }
+            return new Date(a.timestamp) - new Date(b.timestamp);
+        });
+        
+        if (filtered.length === 0) {
+            container.innerHTML = '<div class="empty"><div class="icon">✅</div><p>此類別暫無報告</p></div>';
+            return;
+        }
+        
+        container.innerHTML = filtered.map((r, i) => {
+            const statusText = { safe: '安全', trapped: '被困中', help: '需幫助' };
+            const waitTime = getWaitTime(r.timestamp);
+            const time = new Date(r.timestamp).toLocaleTimeString('zh-HK', { hour:'2-digit', minute:'2-digit' });
+            const needsReview = r.needsManualReview && !r.verified;
+            const cardClass = needsReview ? 'review' : r.status;
+            
+            return `
+                <div class="rescue-card ${cardClass}">
+                    <div class="rescue-header">
+                        <div class="rescue-location">${r.building} ${r.floor}樓 ${r.unit}室</div>
+                        <div class="rescue-badges">
+                            <span class="rescue-priority ${r.status}">${statusText[r.status]}</span>
+                            ${needsReview ? '<span class="rescue-priority review">待審核</span>' : ''}
+                            ${r.verified ? '<span class="rescue-priority" style="background:#27ae60">✓已驗證</span>' : ''}
+                        </div>
+                    </div>
+                    <div class="rescue-meta">
+                        <span>📍 ${r.estate}</span>
+                        <span>⏱️ 等待 ${waitTime}</span>
+                        <span>🕐 ${time}</span>
+                        ${r.phone ? `<span>📞 ${r.phone}</span>` : ''}
+                        ${r.matched ? '<span style="color:var(--safe)">✓已匹配</span>' : '<span style="color:var(--trapped)">⚠未匹配</span>'}
+                    </div>
+                    ${r.note ? `<div class="rescue-note">📝 ${r.note}</div>` : ''}
+                    ${r.photo ? `<img class="rescue-photo" src="${r.photo}" alt="現場" onclick="showPhoto('${r.id}')">` : ''}
+                    <div class="rescue-actions">
+                        <button class="btn-rescued" onclick="markRescued(${r.id})">✅ 已救援</button>
+                        <button class="btn-edit" onclick="openEditModal(${r.id})">✏️ 編輯</button>
+                        ${needsReview ? `<button class="btn-verify" onclick="verifyReport(${r.id})">✓ 確認位置</button>` : ''}
+                        <button class="btn-navigate" onclick="navigate('${r.estate}','${r.building}')">📍 導航</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function getWaitTime(timestamp) {
+        const diff = Date.now() - new Date(timestamp).getTime();
+        const mins = Math.floor(diff / 60000);
+        if (mins < 1) return '剛剛';
+        if (mins < 60) return `${mins}分鐘`;
+        const hours = Math.floor(mins / 60);
+        return `${hours}小時${mins % 60}分`;
+    }
+
+    function markRescued(reportId) {
+        const index = allReports.findIndex(r => r.id === reportId);
+        if (index >= 0) {
+            allReports[index].status = 'safe';
+            allReports[index].note = (allReports[index].note || '') + ' [已救援]';
+            allReports[index].verified = true;
+            allReports[index].verifiedAt = new Date().toISOString();
+            saveReports();
+            loadReports();
+            alert('✅ 已標記為已救援');
+        }
+    }
+
+    function verifyReport(reportId) {
+        const index = allReports.findIndex(r => r.id === reportId);
+        if (index >= 0) {
+            allReports[index].verified = true;
+            allReports[index].needsManualReview = false;
+            allReports[index].verifiedAt = new Date().toISOString();
+            allReports[index].verifiedBy = '消防員';
+            saveReports();
+            loadReports();
+            alert('✅ 已確認位置資料');
+        }
+    }
+
+    function openEditModal(reportId) {
+        const report = allReports.find(r => r.id === reportId);
+        if (!report) return;
+        
+        document.getElementById('editId').value = reportId;
+        document.getElementById('editEstateKey').value = report.estateKey || '';
+        document.getElementById('editEstate').value = report.estate || '';
+        document.getElementById('editBuilding').value = report.building || '';
+        document.getElementById('editFloor').value = report.floor || '';
+        document.getElementById('editUnit').value = report.unit || '';
+        document.getElementById('editStatus').value = report.status || 'help';
+        document.getElementById('editNote').value = report.note || '';
+        
+        document.getElementById('editModal').classList.add('show');
+    }
+
+    function closeEditModal() {
+        document.getElementById('editModal').classList.remove('show');
+    }
+
+    function saveEdit() {
+        const reportId = parseInt(document.getElementById('editId').value);
+        const index = allReports.findIndex(r => r.id === reportId);
+        if (index < 0) return;
+        
+        const estateKey = document.getElementById('editEstateKey').value;
+        const estate = document.getElementById('editEstate').value.trim();
+        
+        allReports[index].estateKey = estateKey || null;
+        allReports[index].estate = estate || (estateKey ? window.estatesManager.getEstate(estateKey)?.name : '');
+        allReports[index].building = document.getElementById('editBuilding').value.trim();
+        allReports[index].floor = document.getElementById('editFloor').value.trim();
+        allReports[index].unit = document.getElementById('editUnit').value.trim();
+        allReports[index].status = document.getElementById('editStatus').value;
+        allReports[index].note = document.getElementById('editNote').value.trim();
+        allReports[index].verified = true;
+        allReports[index].needsManualReview = false;
+        allReports[index].verifiedAt = new Date().toISOString();
+        allReports[index].verifiedBy = '消防員';
+        
+        // 重新驗證匹配
+        if (estateKey) {
+            const result = window.estatesManager.validateLocation(
+                estateKey, 
+                allReports[index].building, 
+                allReports[index].floor, 
+                allReports[index].unit
+            );
+            allReports[index].matched = result.valid;
+        }
+        
+        saveReports();
+        closeEditModal();
+        loadReports();
+        alert('✅ 報告已更新並驗證');
+    }
+
+    function toggleAddSection() {
+        document.getElementById('addSection').classList.toggle('show');
+    }
+
+    function addManualReport() {
+        const estate = document.getElementById('addEstate').value.trim();
+        const building = document.getElementById('addBuilding').value.trim();
+        const floor = document.getElementById('addFloor').value.trim();
+        const unit = document.getElementById('addUnit').value.trim();
+        const status = document.getElementById('addStatus').value;
+        const note = document.getElementById('addNote').value.trim();
+        
+        if (!estate || !floor) {
+            alert('請至少填寫屋苑和樓層');
+            return;
+        }
+        
+        // 嘗試匹配屋苑
+        const match = window.estatesManager.matchEstate(estate);
+        
+        const report = {
+            id: Date.now(),
+            estate: estate,
+            estateKey: match?.key || null,
+            building: building || '未指定',
+            floor: floor,
+            unit: unit || '未指定',
+            phone: null,
+            status: status,
+            note: note ? `[人工新增] ${note}` : '[人工新增]',
+            photo: null,
+            timestamp: new Date().toISOString(),
+            synced: true,
+            matched: match !== null,
+            needsManualReview: false,
+            verified: true,
+            verifiedBy: '消防員',
+            verifiedAt: new Date().toISOString()
+        };
+        
+        allReports.push(report);
+        saveReports();
+        
+        // 清空表單
+        ['addEstate', 'addBuilding', 'addFloor', 'addUnit', 'addNote'].forEach(id => {
+            document.getElementById(id).value = '';
+        });
+        
+        toggleAddSection();
+        loadReports();
+        alert('✅ 報告已新增');
+    }
+
+    function saveReports() {
+        localStorage.setItem('fire_reports', JSON.stringify(allReports));
+        if ('BroadcastChannel' in window) {
+            new BroadcastChannel('fire_safety_sync').postMessage({type:'updated'});
+        }
+    }
+
+    function navigate(estate, building) {
+        alert(`📍 導航至：${estate} ${building}\n\n（實際應用中會打開地圖導航）`);
+    }
+
+    function showPhoto(reportId) {
+        event.stopPropagation();
+        const report = allReports.find(r => r.id === parseInt(reportId));
+        if (report && report.photo) {
+            document.getElementById('photoImg').src = report.photo;
+            document.getElementById('photoModal').classList.add('show');
+        }
+    }
+
+    function closePhoto() {
+        document.getElementById('photoModal').classList.remove('show');
+    }
+
+    function exportCSV() {
+        if (allReports.length === 0) { alert('沒有數據可導出'); return; }
+        const headers = ['ID','狀態','屋苑','大廈','樓層','單位','備註','時間','已匹配','已驗證'];
+        const rows = allReports.map(r => [
+            r.id,
+            r.status === 'safe' ? '安全' : r.status === 'trapped' ? '被困' : '需幫助',
+            r.estate, r.building, r.floor, r.unit,
+            (r.note || '').replace(/,/g, '，'),
+            r.timestamp,
+            r.matched ? '是' : '否',
+            r.verified ? '是' : '否'
+        ]);
+        const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
+        downloadFile(csv, `fire_report_${getDateStr()}.csv`, 'text/csv;charset=utf-8');
+    }
+
+    function exportJSON() {
+        if (allReports.length === 0) { alert('沒有數據可導出'); return; }
+        const exportData = allReports.map(r => ({ ...r, photo: r.photo ? '[有照片]' : null }));
+        downloadFile(JSON.stringify(exportData, null, 2), `fire_report_${getDateStr()}.json`, 'application/json');
+    }
+
+    function downloadFile(content, filename, type) {
+        const blob = new Blob(['\ufeff' + content], { type: type + ';charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+    }
+
+    function getDateStr() { return new Date().toISOString().slice(0,10); }
+
+    function generateDemo() {
+        const statuses = ['safe','safe','safe','help','help','trapped'];
+        const estates = window.estatesManager.getAllEstates();
+        const estateKeys = Object.keys(estates);
+        const notes = ['','','有長者需協助','有小孩','需輪椅','煙霧大，困在廁所','窗邊求救'];
+        
+        const reports = [];
+        for (let i = 0; i < 25; i++) {
+            const estateKey = estateKeys[Math.floor(Math.random() * estateKeys.length)];
+            const estate = estates[estateKey];
+            const building = estate.buildings[Math.floor(Math.random() * estate.buildings.length)];
+            const status = statuses[Math.floor(Math.random() * statuses.length)];
+            const needsReview = Math.random() > 0.7;
+            
+            reports.push({
+                id: Date.now() + i,
+                status: status,
+                estate: estate.name,
+                estateKey: estateKey,
+                building: building.name,
+                floor: Math.floor(Math.random() * building.floors) + 1,
+                unit: building.units[Math.floor(Math.random() * building.units.length)],
+                note: notes[Math.floor(Math.random() * notes.length)],
+                photo: null,
+                timestamp: new Date(Date.now() - Math.random() * 3600000).toISOString(),
+                synced: true,
+                matched: !needsReview,
+                needsManualReview: needsReview,
+                verified: !needsReview
+            });
+        }
+        
+        localStorage.setItem('fire_reports', JSON.stringify(reports));
+        if ('BroadcastChannel' in window) {
+            new BroadcastChannel('fire_safety_sync').postMessage({type:'demo'});
+        }
+        loadReports();
+        alert('🔧 已生成 25 筆測試數據');
+    }
+
+    function clearAll() {
+        if (confirm('確定要清除所有數據嗎？')) {
+            localStorage.removeItem('fire_reports');
+            localStorage.removeItem('active_alert');
+            if ('BroadcastChannel' in window) {
+                new BroadcastChannel('fire_safety_sync').postMessage({type:'clear'});
+            }
+            loadReports();
+            alert('✅ 數據已清除');
+        }
+    }
+    </script>
+</body>
+</html>

@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+    <meta name="theme-color" content="#3498db">
+    <title>查看親友狀態</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root{--safe:#2ed573;--help:#ff4757;--trapped:#ffa502;--unknown:#747d8c;--bg:#1a1a2e;--card:#16213e;--text:#fff;}
+        body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:12px;}
+        .hdr{display:flex;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.1);margin-bottom:16px;}
+        .hdr a{color:var(--text);text-decoration:none;font-size:26px;padding:8px}
+        .hdr h1{flex:1;font-size:18px;text-align:center}
+        .hdr .refresh{font-size:22px;padding:8px;cursor:pointer}
+        .filter-section{background:var(--card);border-radius:12px;padding:14px;margin-bottom:16px;}
+        .filter-row{display:flex;gap:10px;margin-bottom:10px}
+        select{flex:1;padding:12px;border-radius:10px;border:2px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.08);color:var(--text);font-size:15px;}
+        select:focus{border-color:var(--safe);outline:none}
+        .search-btn{padding:12px 18px;background:var(--safe);border:none;border-radius:10px;color:#000;font-weight:bold;font-size:16px;cursor:pointer;}
+        .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;}
+        .stat{background:var(--card);border-radius:10px;padding:14px 8px;text-align:center;}
+        .stat .num{font-size:24px;font-weight:bold}
+        .stat .label{font-size:10px;opacity:0.7;margin-top:2px}
+        .stat.safe .num{color:var(--safe)}
+        .stat.help .num{color:var(--help)}
+        .stat.trapped .num{color:var(--trapped)}
+        .stat.unknown .num{color:var(--unknown)}
+        .legend{display:flex;justify-content:center;gap:14px;margin-bottom:16px;font-size:12px;}
+        .legend span{display:flex;align-items:center;gap:4px}
+        .legend .dot{width:14px;height:14px;border-radius:50%}
+        .legend .dot.safe{background:var(--safe)}
+        .legend .dot.help{background:var(--help)}
+        .legend .dot.trapped{background:var(--trapped)}
+        .legend .dot.unknown{background:var(--unknown)}
+        .report-list{display:flex;flex-direction:column;gap:12px}
+        .report-card{background:var(--card);border-radius:12px;padding:14px;border-left:5px solid var(--unknown);cursor:pointer;}
+        .report-card.safe{border-left-color:var(--safe)}
+        .report-card.help{border-left-color:var(--help)}
+        .report-card.trapped{border-left-color:var(--trapped)}
+        .report-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;}
+        .report-location{font-size:16px;font-weight:bold}
+        .report-badge{padding:4px 10px;border-radius:6px;font-size:12px;font-weight:bold;}
+        .report-badge.safe{background:var(--safe);color:#000}
+        .report-badge.help{background:var(--help)}
+        .report-badge.trapped{background:var(--trapped);color:#000}
+        .report-time{font-size:12px;opacity:0.7;margin-bottom:8px}
+        .report-note{font-size:13px;padding:10px;background:rgba(255,255,255,0.05);border-radius:8px;margin-bottom:10px;}
+        .report-photo{width:100%;border-radius:8px;max-height:180px;object-fit:cover;margin-bottom:10px;cursor:pointer;}
+        .empty{text-align:center;padding:40px 20px;opacity:0.6;}
+        .empty .icon{font-size:52px;margin-bottom:12px}
+        .modal{position:fixed;inset:0;background:rgba(0,0,0,0.95);display:none;align-items:center;justify-content:center;z-index:1000;padding:16px;}
+        .modal.show{display:flex}
+        .modal-content{background:var(--card);border-radius:16px;padding:20px;max-width:380px;width:100%;max-height:90vh;overflow-y:auto;}
+        .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+        .modal-header h2{font-size:18px}
+        .modal-close{background:none;border:none;color:var(--text);font-size:28px;cursor:pointer;}
+        .modal-status{text-align:center;padding:20px;border-radius:12px;margin-bottom:16px;font-size:20px;font-weight:bold;}
+        .modal-status.safe{background:rgba(46,213,115,0.2);color:var(--safe)}
+        .modal-status.help{background:rgba(255,71,87,0.2);color:var(--help)}
+        .modal-status.trapped{background:rgba(255,165,2,0.2);color:var(--trapped)}
+        .modal-photo{width:100%;border-radius:10px;margin-bottom:16px;}
+        .modal-row{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.1);font-size:14px;}
+        .modal-row .label{opacity:0.7}
+        .modal-note{padding:14px;background:rgba(255,255,255,0.05);border-radius:10px;margin-top:16px;font-size:14px;}
+        .photo-fullscreen{position:fixed;inset:0;background:#000;display:none;align-items:center;justify-content:center;z-index:2000;}
+        .photo-fullscreen.show{display:flex}
+        .photo-fullscreen img{max-width:100%;max-height:100%;object-fit:contain}
+        .photo-fullscreen .close{position:absolute;top:20px;right:20px;width:44px;height:44px;background:rgba(255,255,255,0.2);border:none;border-radius:50%;color:#fff;font-size:24px;cursor:pointer;}
+    </style>
+</head>
+<body>
+    <header class="hdr">
+        <a href="index.html">←</a>
+        <h1>👨‍👩‍👧 查看親友狀態</h1>
+        <span class="refresh" onclick="loadReports()">🔄</span>
+    </header>
+
+    <section class="filter-section">
+        <div class="filter-row">
+            <select id="selEstate" onchange="onEstateChange()">
+                <option value="">全部屋苑</option>
+            </select>
+            <select id="selBuilding" onchange="filterReports()">
+                <option value="">全部大廈</option>
+            </select>
+        </div>
+        <div class="filter-row">
+            <select id="selStatus" onchange="filterReports()">
+                <option value="">全部狀態</option>
+                <option value="safe">✅ 安全</option>
+                <option value="trapped">🚨 被困</option>
+                <option value="help">🆘 需幫助</option>
+            </select>
+            <button class="search-btn" onclick="filterReports()">🔍 搜尋</button>
+        </div>
+    </section>
+
+    <section class="stats">
+        <div class="stat safe">
+            <div class="num" id="statSafe">0</div>
+            <div class="label">安全</div>
+        </div>
+        <div class="stat trapped">
+            <div class="num" id="statTrapped">0</div>
+            <div class="label">被困</div>
+        </div>
+        <div class="stat help">
+            <div class="num" id="statHelp">0</div>
+            <div class="label">需幫助</div>
+        </div>
+        <div class="stat">
+            <div class="num" id="statTotal">0</div>
+            <div class="label">總數</div>
+        </div>
+    </section>
+
+    <div class="legend">
+        <span><div class="dot safe"></div>安全</span>
+        <span><div class="dot trapped"></div>被困</span>
+        <span><div class="dot help"></div>需幫助</span>
+    </div>
+
+    <section class="report-list" id="reportList">
+        <div class="empty">
+            <div class="icon">📋</div>
+            <p>暫無報告</p>
+        </div>
+    </section>
+
+    <div class="modal" id="detailModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">--</h2>
+                <button class="modal-close" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-status" id="modalStatus">--</div>
+            <img class="modal-photo" id="modalPhoto" style="display:none" onclick="showFullPhoto()">
+            <div class="modal-row">
+                <span class="label">報告時間</span>
+                <span id="modalTime">--</span>
+            </div>
+            <div class="modal-row">
+                <span class="label">屋苑</span>
+                <span id="modalEstate">--</span>
+            </div>
+            <div class="modal-row">
+                <span class="label">位置</span>
+                <span id="modalLocation">--</span>
+            </div>
+            <div class="modal-row">
+                <span class="label">位置驗證</span>
+                <span id="modalVerified">--</span>
+            </div>
+            <div class="modal-note" id="modalNote" style="display:none"></div>
+        </div>
+    </div>
+
+    <div class="photo-fullscreen" id="photoFullscreen" onclick="closeFullPhoto()">
+        <img id="fullscreenImg" src="">
+        <button class="close">×</button>
+    </div>
+
+    <script src="estates-data.js"></script>
+    <script>
+    let allReports = [];
+    let filteredReports = [];
+    let currentReport = null;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        initEstates();
+        loadReports();
+        
+        if ('BroadcastChannel' in window) {
+            const ch = new BroadcastChannel('fire_safety_sync');
+            ch.onmessage = () => loadReports();
+        }
+        
+        setInterval(loadReports, 10000);
+    });
+
+    function initEstates() {
+        const sel = document.getElementById('selEstate');
+        const estates = window.estatesManager.getAllEstates();
+        sel.innerHTML = '<option value="">全部屋苑</option>';
+        for (const [key, estate] of Object.entries(estates)) {
+            sel.innerHTML += `<option value="${key}">${estate.name}</option>`;
+        }
+    }
+
+    function loadReports() {
+        allReports = JSON.parse(localStorage.getItem('fire_reports') || '[]');
+        allReports.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        filterReports();
+    }
+
+    function onEstateChange() {
+        const estateKey = document.getElementById('selEstate').value;
+        const buildingSel = document.getElementById('selBuilding');
+        buildingSel.innerHTML = '<option value="">全部大廈</option>';
+        
+        if (estateKey) {
+            const estate = window.estatesManager.getEstate(estateKey);
+            if (estate) {
+                estate.buildings.forEach(b => {
+                    buildingSel.innerHTML += `<option value="${b.name}">${b.name}</option>`;
+                });
+            }
+        }
+        filterReports();
+    }
+
+    function filterReports() {
+        const estateKey = document.getElementById('selEstate').value;
+        const building = document.getElementById('selBuilding').value;
+        const status = document.getElementById('selStatus').value;
+        
+        filteredReports = allReports.filter(r => {
+            if (estateKey && r.estateKey !== estateKey) return false;
+            if (building && r.building !== building) return false;
+            if (status && r.status !== status) return false;
+            return true;
+        });
+        
+        updateStats();
+        renderReports();
+    }
+
+    function updateStats() {
+        const safe = filteredReports.filter(r => r.status === 'safe').length;
+        const trapped = filteredReports.filter(r => r.status === 'trapped').length;
+        const help = filteredReports.filter(r => r.status === 'help').length;
+        
+        document.getElementById('statSafe').textContent = safe;
+        document.getElementById('statTrapped').textContent = trapped;
+        document.getElementById('statHelp').textContent = help;
+        document.getElementById('statTotal').textContent = filteredReports.length;
+    }
+
+    function renderReports() {
+        const container = document.getElementById('reportList');
+        
+        if (filteredReports.length === 0) {
+            container.innerHTML = '<div class="empty"><div class="icon">📋</div><p>暫無報告</p></div>';
+            return;
+        }
+        
+        container.innerHTML = filteredReports.map((r, i) => {
+            const statusText = { safe: '✅ 安全', trapped: '🚨 被困', help: '🆘 需幫助' };
+            const time = new Date(r.timestamp).toLocaleString('zh-HK', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
+            
+            return `
+                <div class="report-card ${r.status}" onclick="showDetail(${i})">
+                    <div class="report-top">
+                        <div class="report-location">${r.building} ${r.floor}樓 ${r.unit}室</div>
+                        <span class="report-badge ${r.status}">${statusText[r.status]}</span>
+                    </div>
+                    <div class="report-time">📍 ${r.estate} · ⏰ ${time}</div>
+                    ${r.note ? `<div class="report-note">📝 ${r.note}</div>` : ''}
+                    ${r.photo ? `<img class="report-photo" src="${r.photo}" alt="現場照片" onclick="event.stopPropagation();showPhoto('${r.photo}')">` : ''}
+                </div>
+            `;
+        }).join('');
+    }
+
+    function showDetail(index) {
+        const r = filteredReports[index];
+        currentReport = r;
+        
+        const statusMap = { safe: '✅ 已報平安', trapped: '🚨 被困中', help: '🆘 需要幫助' };
+        
+        document.getElementById('modalTitle').textContent = `${r.building} ${r.floor}樓 ${r.unit}室`;
+        document.getElementById('modalStatus').textContent = statusMap[r.status];
+        document.getElementById('modalStatus').className = 'modal-status ' + r.status;
+        document.getElementById('modalTime').textContent = new Date(r.timestamp).toLocaleString('zh-HK');
+        document.getElementById('modalEstate').textContent = r.estate;
+        document.getElementById('modalLocation').textContent = `${r.building} ${r.floor}樓 ${r.unit}室`;
+        
+        let verifiedText = r.verified ? '✅ 已驗證' : (r.matched ? '⚠️ 自動匹配' : '❓ 待確認');
+        document.getElementById('modalVerified').textContent = verifiedText;
+        
+        const photoEl = document.getElementById('modalPhoto');
+        if (r.photo) {
+            photoEl.src = r.photo;
+            photoEl.style.display = 'block';
+        } else {
+            photoEl.style.display = 'none';
+        }
+        
+        const noteEl = document.getElementById('modalNote');
+        if (r.note) {
+            noteEl.textContent = '📝 ' + r.note;
+            noteEl.style.display = 'block';
+        } else {
+            noteEl.style.display = 'none';
+        }
+        
+        document.getElementById('detailModal').classList.add('show');
+    }
+
+    function closeModal() {
+        document.getElementById('detailModal').classList.remove('show');
+    }
+
+    function showPhoto(src) {
+        document.getElementById('fullscreenImg').src = src;
+        document.getElementById('photoFullscreen').classList.add('show');
+    }
+
+    function showFullPhoto() {
+        if (currentReport && currentReport.photo) {
+            showPhoto(currentReport.photo);
+        }
+    }
+
+    function closeFullPhoto() {
+        document.getElementById('photoFullscreen').classList.remove('show');
+    }
+    </script>
+</body>
+</html>

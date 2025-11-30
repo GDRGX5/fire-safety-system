@@ -1,0 +1,133 @@
+/**
+ * 智能防火與逃生系統 - Service Worker
+ * 版本：1.1.0
+ */
+
+const CACHE_VERSION = 'fire-safety-v1.1.0';
+
+const PRECACHE_FILES = [
+    '/',
+    '/index.html',
+    '/resident-lite.html',
+    '/family.html',
+    '/firefighter.html',
+    '/admin.html',
+    '/estates-data.js',
+    '/manifest.json',
+    '/icon-192.png',
+    '/icon-512.png'
+];
+
+self.addEventListener('install', (event) => {
+    console.log('[SW] Installing...');
+    event.waitUntil(
+        caches.open(CACHE_VERSION)
+            .then((cache) => cache.addAll(PRECACHE_FILES))
+            .then(() => self.skipWaiting())
+            .catch((error) => console.error('[SW] Precache failed:', error))
+    );
+});
+
+self.addEventListener('activate', (event) => {
+    console.log('[SW] Activated');
+    event.waitUntil(
+        caches.keys()
+            .then((cacheNames) => Promise.all(
+                cacheNames
+                    .filter((name) => name !== CACHE_VERSION)
+                    .map((name) => caches.delete(name))
+            ))
+            .then(() => self.clients.claim())
+    );
+});
+
+self.addEventListener('fetch', (event) => {
+    if (event.request.method !== 'GET' || !event.request.url.startsWith('http')) return;
+    
+    event.respondWith(
+        caches.match(event.request)
+            .then((cached) => {
+                if (cached) return cached;
+                
+                return fetch(event.request)
+                    .then((response) => {
+                        if (!response || response.status !== 200 || response.type !== 'basic') {
+                            return response;
+                        }
+                        const responseToCache = response.clone();
+                        caches.open(CACHE_VERSION).then((cache) => cache.put(event.request, responseToCache));
+                        return response;
+                    })
+                    .catch(() => {
+                        if (event.request.mode === 'navigate') {
+                            return caches.match('/index.html');
+                        }
+                        return new Response('離線模式', { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+                    });
+            })
+    );
+});
+
+self.addEventListener('push', (event) => {
+    const data = {
+        title: '🔥 火災警報',
+        body: '您附近發生火警，請立即查看',
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        tag: 'fire-alert',
+        requireInteraction: true,
+        vibrate: [200, 100, 200, 100, 200],
+        actions: [
+            { action: 'report', title: '📤 報平安' },
+            { action: 'view', title: '👀 查看詳情' }
+        ]
+    };
+    
+    if (event.data) {
+        try { Object.assign(data, event.data.json()); }
+        catch (e) { data.body = event.data.text(); }
+    }
+    
+    event.waitUntil(self.registration.showNotification(data.title, data));
+});
+
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    const url = event.action === 'report' ? '/resident-lite.html' : '/index.html';
+    event.waitUntil(
+        clients.matchAll({ type: 'window' })
+            .then((clientList) => {
+                for (const client of clientList) {
+                    if (client.url.includes(url) && 'focus' in client) return client.focus();
+                }
+                return clients.openWindow(url);
+            })
+    );
+});
+
+self.addEventListener('sync', (event) => {
+    if (event.tag === 'sync-reports') {
+        event.waitUntil(
+            self.clients.matchAll().then((clients) => {
+                clients.forEach((client) => client.postMessage({ type: 'SYNC_REPORTS' }));
+            })
+        );
+    }
+});
+
+self.addEventListener('message', (event) => {
+    const { type, data } = event.data || {};
+    switch (type) {
+        case 'SKIP_WAITING': self.skipWaiting(); break;
+        case 'GET_VERSION': event.ports[0]?.postMessage({ version: CACHE_VERSION }); break;
+        case 'CLEAR_CACHE': caches.keys().then((names) => names.forEach((n) => caches.delete(n))); break;
+        case 'SHOW_NOTIFICATION':
+            self.registration.showNotification(data?.title || '通知', {
+                body: data?.body || '',
+                icon: '/icon-192.png'
+            });
+            break;
+    }
+});
+
+console.log('[SW] Loaded');

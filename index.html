@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+    <meta name="theme-color" content="#ff4757">
+    <meta name="description" content="智能防火與逃生系統 - 火災報平安">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <title>智能防火與逃生系統</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root{--safe:#2ed573;--help:#ff4757;--trapped:#ffa502;--unknown:#747d8c;--bg:#1a1a2e;--card:#16213e;--text:#fff;}
+        body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:16px;}
+        .header{text-align:center;padding:24px 0;margin-bottom:20px}
+        .logo{font-size:56px;margin-bottom:12px}
+        .title{font-size:24px;font-weight:bold;margin-bottom:6px}
+        .subtitle{font-size:14px;opacity:0.7;margin-bottom:12px}
+        .status-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;font-size:14px;}
+        .status-badge.online{background:rgba(46,213,115,0.2)}
+        .status-badge.offline{background:rgba(255,71,87,0.2)}
+        .alert-box{background:linear-gradient(135deg,#ff4757,#c0392b);border-radius:14px;padding:16px;margin-bottom:20px;display:none;animation:pulse 2s infinite;}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.85}}
+        .alert-box.show{display:block}
+        .alert-box h3{font-size:16px;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+        .alert-box p{font-size:14px;opacity:0.9}
+        .role-buttons{display:flex;flex-direction:column;gap:14px;margin-bottom:24px}
+        .role-btn{display:flex;align-items:center;padding:20px 18px;border-radius:16px;text-decoration:none;color:var(--text);transition:transform 0.15s;}
+        .role-btn:active{transform:scale(0.98)}
+        .role-btn .icon{font-size:44px;margin-right:16px}
+        .role-btn .info h3{font-size:19px;margin-bottom:4px}
+        .role-btn .info p{font-size:13px;opacity:0.85}
+        .role-btn .arrow{margin-left:auto;font-size:24px;opacity:0.5}
+        .role-resident{background:linear-gradient(135deg,#2ed573,#26de81)}
+        .role-resident .icon,.role-resident .info h3,.role-resident .info p,.role-resident .arrow{color:#000}
+        .role-family{background:linear-gradient(135deg,#3498db,#2980b9)}
+        .role-firefighter{background:linear-gradient(135deg,#ff4757,#c0392b)}
+        .role-admin{background:linear-gradient(135deg,#9b59b6,#8e44ad)}
+        .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px;}
+        .stat{background:var(--card);border-radius:14px;padding:18px 12px;text-align:center;}
+        .stat .num{font-size:32px;font-weight:bold}
+        .stat .label{font-size:12px;opacity:0.7;margin-top:4px}
+        .stat.safe .num{color:var(--safe)}
+        .stat.help .num{color:var(--help)}
+        .stat.trapped .num{color:var(--trapped)}
+        .principles{background:var(--card);border-radius:14px;padding:18px;}
+        .principles h3{font-size:14px;margin-bottom:14px;text-align:center}
+        .principle-list{display:flex;flex-direction:column;gap:10px}
+        .principle{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:10px;font-size:14px;}
+        .principle:nth-child(1){background:rgba(255,71,87,0.15)}
+        .principle:nth-child(2){background:rgba(255,165,2,0.15)}
+        .principle:nth-child(3){background:rgba(46,213,115,0.15)}
+        .principle:nth-child(4){background:rgba(116,125,140,0.15)}
+        .principle .icon{font-size:20px}
+        .demo-btn{display:block;width:100%;padding:14px;margin-top:20px;background:rgba(255,255,255,0.08);border:1px dashed rgba(255,255,255,0.25);border-radius:10px;color:rgba(255,255,255,0.7);font-size:14px;cursor:pointer;text-align:center;}
+        .demo-btn:active{background:rgba(255,255,255,0.12)}
+        .install-prompt{position:fixed;bottom:20px;left:16px;right:16px;background:var(--card);border-radius:14px;padding:16px;display:none;align-items:center;gap:12px;box-shadow:0 4px 20px rgba(0,0,0,0.4);z-index:100;}
+        .install-prompt.show{display:flex}
+        .install-prompt p{flex:1;font-size:14px}
+        .install-prompt button{padding:10px 16px;border:none;border-radius:8px;font-size:14px;cursor:pointer;}
+        .install-btn{background:var(--safe);color:#000;font-weight:bold}
+        .dismiss-btn{background:transparent;color:rgba(255,255,255,0.6)}
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="logo">🔥</div>
+        <h1 class="title">智能防火與逃生系統</h1>
+        <p class="subtitle">香港創科展 2025-2026</p>
+        <div class="status-badge online" id="statusBadge">
+            <span id="statusIcon">🟢</span>
+            <span id="statusText">系統在線</span>
+        </div>
+    </header>
+
+    <div class="alert-box" id="alertBox">
+        <h3>⚠️ 緊急火災警報</h3>
+        <p id="alertText">--</p>
+    </div>
+
+    <section class="role-buttons">
+        <a href="resident-lite.html" class="role-btn role-resident">
+            <span class="icon">🏃</span>
+            <div class="info">
+                <h3>我是受災市民</h3>
+                <p>⚡ 快速報告位置和狀態</p>
+            </div>
+            <span class="arrow">→</span>
+        </a>
+        <a href="family.html" class="role-btn role-family">
+            <span class="icon">👨‍👩‍👧</span>
+            <div class="info">
+                <h3>我是家人/朋友</h3>
+                <p>查看親友安全狀態</p>
+            </div>
+            <span class="arrow">→</span>
+        </a>
+        <a href="firefighter.html" class="role-btn role-firefighter">
+            <span class="icon">👨‍🚒</span>
+            <div class="info">
+                <h3>我是消防員</h3>
+                <p>救援控制台・優先級列表</p>
+            </div>
+            <span class="arrow">→</span>
+        </a>
+        <a href="admin.html" class="role-btn role-admin">
+            <span class="icon">⚙️</span>
+            <div class="info">
+                <h3>開發者後台</h3>
+                <p>屋苑資料管理</p>
+            </div>
+            <span class="arrow">→</span>
+        </a>
+    </section>
+
+    <section class="stats">
+        <div class="stat safe">
+            <div class="num" id="statSafe">0</div>
+            <div class="label">已報平安</div>
+        </div>
+        <div class="stat trapped">
+            <div class="num" id="statTrapped">0</div>
+            <div class="label">被困/求助</div>
+        </div>
+        <div class="stat">
+            <div class="num" id="statTotal">0</div>
+            <div class="label">總報告數</div>
+        </div>
+    </section>
+
+    <section class="principles">
+        <h3>📐 系統設計原則</h3>
+        <div class="principle-list">
+            <div class="principle"><span class="icon">⚡</span> 極速載入（&lt;1秒）</div>
+            <div class="principle"><span class="icon">👆</span> 一鍵操作，緊急時不慌</div>
+            <div class="principle"><span class="icon">📴</span> 離線可用，網絡中斷也能報告</div>
+            <div class="principle"><span class="icon">👴</span> 長者友好，大按鈕高對比</div>
+        </div>
+    </section>
+
+    <button class="demo-btn" onclick="toggleDemo()">🔧 示範模式（生成測試數據）</button>
+
+    <div class="install-prompt" id="installPrompt">
+        <span>📲</span>
+        <p>安裝到主畫面，緊急時快速開啟</p>
+        <button class="dismiss-btn" onclick="dismissInstall()">稍後</button>
+        <button class="install-btn" onclick="installPWA()">安裝</button>
+    </div>
+
+    <script src="estates-data.js"></script>
+    <script>
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        if (!localStorage.getItem('pwa_dismissed')) {
+            document.getElementById('installPrompt').classList.add('show');
+        }
+    });
+    function installPWA() {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then(() => {
+                deferredPrompt = null;
+                document.getElementById('installPrompt').classList.remove('show');
+            });
+        }
+    }
+    function dismissInstall() {
+        document.getElementById('installPrompt').classList.remove('show');
+        localStorage.setItem('pwa_dismissed', 'true');
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(e => console.log('SW:', e));
+        }
+        
+        updateNetworkStatus();
+        window.addEventListener('online', updateNetworkStatus);
+        window.addEventListener('offline', updateNetworkStatus);
+        
+        updateStats();
+        
+        if ('BroadcastChannel' in window) {
+            const ch = new BroadcastChannel('fire_safety_sync');
+            ch.onmessage = () => updateStats();
+        }
+        
+        checkAlert();
+    });
+
+    function updateNetworkStatus() {
+        const badge = document.getElementById('statusBadge');
+        const icon = document.getElementById('statusIcon');
+        const text = document.getElementById('statusText');
+        if (navigator.onLine) {
+            badge.className = 'status-badge online';
+            icon.textContent = '🟢';
+            text.textContent = '系統在線';
+        } else {
+            badge.className = 'status-badge offline';
+            icon.textContent = '🔴';
+            text.textContent = '離線模式';
+        }
+    }
+
+    function updateStats() {
+        const reports = JSON.parse(localStorage.getItem('fire_reports') || '[]');
+        const safe = reports.filter(r => r.status === 'safe').length;
+        const urgent = reports.filter(r => r.status === 'help' || r.status === 'trapped').length;
+        
+        document.getElementById('statSafe').textContent = safe;
+        document.getElementById('statTrapped').textContent = urgent;
+        document.getElementById('statTotal').textContent = reports.length;
+    }
+
+    function checkAlert() {
+        const alert = localStorage.getItem('active_alert');
+        if (alert) {
+            const data = JSON.parse(alert);
+            document.getElementById('alertText').textContent = data.message;
+            document.getElementById('alertBox').classList.add('show');
+        }
+    }
+
+    function toggleDemo() {
+        const isDemo = localStorage.getItem('demo_mode') === 'true';
+        
+        if (isDemo) {
+            localStorage.removeItem('demo_mode');
+            localStorage.removeItem('fire_reports');
+            localStorage.removeItem('active_alert');
+            document.getElementById('alertBox').classList.remove('show');
+            alert('✅ 示範模式已關閉');
+        } else {
+            localStorage.setItem('demo_mode', 'true');
+            generateDemoData();
+            localStorage.setItem('active_alert', JSON.stringify({
+                message: '美孚新邨 第3座 發生火警',
+                timestamp: new Date().toISOString()
+            }));
+            checkAlert();
+            alert('🔥 示範模式已開啟！');
+        }
+        updateStats();
+    }
+
+    function generateDemoData() {
+        const statuses = ['safe','safe','safe','safe','help','trapped'];
+        const estates = window.estatesManager.getAllEstates();
+        const estateKeys = Object.keys(estates);
+        const notes = ['','','有老人需要協助','有小孩','需要輪椅','煙霧很大，被困廁所'];
+        const reports = [];
+        
+        for (let i = 0; i < 30; i++) {
+            const estateKey = estateKeys[Math.floor(Math.random() * estateKeys.length)];
+            const estate = estates[estateKey];
+            const building = estate.buildings[Math.floor(Math.random() * estate.buildings.length)];
+            const status = statuses[Math.floor(Math.random() * statuses.length)];
+            const needsReview = Math.random() > 0.8;
+            
+            reports.push({
+                id: Date.now() + i,
+                status: status,
+                estate: estate.name,
+                estateKey: estateKey,
+                building: building.name,
+                floor: Math.floor(Math.random() * building.floors) + 1,
+                unit: building.units[Math.floor(Math.random() * building.units.length)],
+                note: notes[Math.floor(Math.random() * notes.length)],
+                photo: null,
+                timestamp: new Date(Date.now() - Math.random() * 3600000).toISOString(),
+                synced: true,
+                matched: !needsReview,
+                needsManualReview: needsReview,
+                verified: !needsReview
+            });
+        }
+        localStorage.setItem('fire_reports', JSON.stringify(reports));
+        
+        if ('BroadcastChannel' in window) {
+            new BroadcastChannel('fire_safety_sync').postMessage({type:'demo'});
+        }
+    }
+    </script>
+</body>
+</html>
